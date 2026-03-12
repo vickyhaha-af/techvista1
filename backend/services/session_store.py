@@ -1,68 +1,134 @@
 """
-File-based session store — persists sessions across restarts.
-Sessions written as JSON to /tmp/techvista_sessions/
+Supabase PostgreSQL session store — persists sessions reliably across restarts.
 TTL: 24 hours (auto-purged on read).
 """
-import os
 import json
 import time
-import uuid
-from pathlib import Path
+from datetime import datetime, timedelta
+from typing import Optional
+from db.supabase_client import get_supabase
 from models.schemas import SessionData
 
-STORE_DIR = Path("/tmp/techvista_sessions")
 TTL_SECONDS = 86400  # 24 hours
 
 
-def _ensure_dir():
-    STORE_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def _path(session_id: str) -> Path:
-    return STORE_DIR / f"{session_id}.json"
-
-
-def save_session(session: SessionData) -> None:
-    _ensure_dir()
-    payload = {
-        "saved_at": time.time(),
-        "data": session.model_dump()
-    }
-    with open(_path(session.session_id), "w") as f:
-        json.dump(payload, f)
-
-
-def load_session(session_id: str) -> SessionData | None:
-    p = _path(session_id)
-    if not p.exists():
+def _supabase_to_session(data: dict) -> Optional[SessionData]:
+    """Convert Supabase row to SessionData."""
+    if not data:
         return None
     try:
-        with open(p) as f:
-            payload = json.load(f)
-        # TTL check
-        if time.time() - payload["saved_at"] > TTL_SECONDS:
-            p.unlink(missing_ok=True)
-            return None
-        return SessionData(**payload["data"])
+        # Parse the JSONB data field
+        session_data = data.get("data", {})
+        return SessionData(**session_data)
     except Exception:
         return None
 
 
-def delete_session(session_id: str) -> None:
-    _path(session_id).unlink(missing_ok=True)
+def _session_to_dict(session: SessionData) -> dict:
+    """Convert SessionData to dict for storage."""
+    return {
+        "session_id": session.session_id,
+        "user_id": getattr(session, "user_id", None),
+        "data": session.model_dump(),
+        "saved_at": datetime.now().isoformat(),
+    }
+
+
+def save_session(session: SessionData) -> bool:
+    """Save session to Supabase. Returns True if successful."""
+    supabase = get_supabase()
+    if not supabase:
+        return False
+    
+    try:
+        payload = _session_to_dict(session)
+        
+        # Upsert: insert if not exists, update if exists
+        supabase.table("sessions").upsert(
+            payload,
+            on_conflict="session_id"
+        ).execute()
+        return True
+    except Exception as e:
+        print(f"[SessionStore] Save failed: {e}")
+        return False
+
+
+def load_session(session_id: str) -> Optional[SessionData]:
+    """Load session from Supabase with TTL check."""
+    supabase = get_supabase()
+    if not supabase:
+        return None
+    
+    try:
+        result = supabase.table("sessions").select("*").eq("session_id", session_id).execute()
+        
+        if not result.data:
+            return None
+        
+        row = result.data[0]
+        
+        # TTL check
+        saved_at = row.get("saved_at")
+        if saved_at:
+            try:
+                saved_time = datetime.fromisoformat(saved_at)
+                if datetime.now() - saved_time > timedelta(seconds=TTL_SECONDS):
+                    # Expired - delete it
+                    delete_session(session_id)
+                    return None
+            except (ValueError, TypeError):
+                pass
+        
+        return _supabase_to_session(row)
+    except Exception as e:
+        print(f"[SessionStore] Load failed: {e}")
+        return None
+
+
+def delete_session(session_id: str) -> bool:
+    """Delete session from Supabase."""
+    supabase = get_supabase()
+    if not supabase:
+        return False
+    
+    try:
+        supabase.table("sessions").delete().eq("session_id", session_id).execute()
+        return True
+    except Exception as e:
+        print(f"[SessionStore] Delete failed: {e}")
+        return False
 
 
 def purge_expired() -> int:
-    _ensure_dir()
-    removed = 0
-    for f in STORE_DIR.glob("*.json"):
-        try:
-            with open(f) as fp:
-                payload = json.load(fp)
-            if time.time() - payload.get("saved_at", 0) > TTL_SECONDS:
-                f.unlink(missing_ok=True)
-                removed += 1
-        except Exception:
-            f.unlink(missing_ok=True)
-            removed += 1
-    return removed
+    """Delete expired sessions from Supabase. Returns count removed."""
+    supabase = get_supabase()
+    if not supabase:
+        return 0
+    
+    try:
+        cutoff = (datetime.now() - timedelta(seconds=TTL_SECONDS)).isoformat()
+        result = supabase.table("sessions").delete().lt("saved_at", cutoff).execute()
+        return len(result.data) if result.data else 0
+    except Exception as e:
+        print(f"[SessionStore] Purge failed: {e}")
+        return 0
+
+
+def list_user_sessions(user_id: str) -> list[SessionData]:
+    """List all sessions for a specific user."""
+    supabase = get_supabase()
+    if not supabase:
+        return []
+    
+    try:
+        result = supabase.table("sessions").select("*").eq("user_id", user_id).execute()
+        sessions = []
+        for row in result.data or []:
+            session = _supabase_to_session(row)
+            if session:
+                sessions.append(session)
+        return sessions
+    except Exception as e:
+        print(f"[SessionStore] List failed: {e}")
+        return []

@@ -62,6 +62,13 @@ EXPERIENCE_COHORTS = {
 API_CALL_DELAY_SECONDS = 0.5
 MAX_RETRIES = 3
 
+# CORS Origins - Production Security
+# Default allows local dev; override with env var for production
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173"
+).split(",")
+
 # Feature 2 & 3: Advanced Hiring OS Parameters
 TALENT_POOL_DECAY_LAMBDA = float(os.getenv("TALENT_POOL_DECAY_LAMBDA", "0.005"))
 TALENT_POOL_MIN_SCORE = float(os.getenv("TALENT_POOL_MIN_SCORE", "30.0"))

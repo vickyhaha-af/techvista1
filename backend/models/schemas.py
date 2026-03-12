@@ -93,6 +93,7 @@ class WeightsUpdate(BaseModel):
 
 class SessionData(BaseModel):
     session_id: str
+    user_id: Optional[str] = None  # Owner of this session
     jd: Optional[ParsedJD] = None
     jd_quality: Optional[JDQualityReport] = None
     resumes: list[ParsedResume] = Field(default_factory=list)

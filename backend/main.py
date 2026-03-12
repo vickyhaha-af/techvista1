@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from typing import Optional
 
-from config import DEFAULT_WEIGHTS
+from config import DEFAULT_WEIGHTS, ALLOWED_ORIGINS
 from models.schemas import SessionData, WeightsUpdate, ParsedJD
 from services.file_handler import extract_text
 from services.parser import parse_resume, parse_jd
@@ -54,17 +54,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS for frontend
+# CORS for frontend - Restricted to specific origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", "http://localhost:5174",
-        "http://localhost:3000", "http://127.0.0.1:5173",
-        "http://172.16.3.26:5173", "http://172.16.3.26:5174",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
 
 # Register routes
