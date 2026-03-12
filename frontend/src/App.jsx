@@ -7,8 +7,10 @@ import ResultsPage from './pages/ResultsPage'
 import DashboardPage from './pages/DashboardPage'
 import ExportPage from './pages/ExportPage'
 import LandingPage from './pages/LandingPage'
+import LoginPage from './pages/LoginPage'
 import { ToastProvider } from './components/Toast'
 import { ModalProvider, SpatialContent } from './components/ModalContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 // Global session context
 const SessionContext = createContext(null)
@@ -71,6 +73,7 @@ function AppContent() {
         {currentStep > 0 && <Navbar currentStep={currentStep} />}
         <Routes>
           <Route path="/" element={<LandingPage onStart={startScreening} />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/upload" element={<UploadPage />} />
           <Route path="/processing" element={<ProcessingPage />} />
           <Route path="/results" element={<ResultsPage />} />
@@ -87,11 +90,13 @@ function AppContent() {
 function App() {
   return (
     <BrowserRouter>
-      <ToastProvider>
-        <ModalProvider>
-          <AppContent />
-        </ModalProvider>
-      </ToastProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <ModalProvider>
+            <AppContent />
+          </ModalProvider>
+        </ToastProvider>
+      </AuthProvider>
     </BrowserRouter>
   )
 }

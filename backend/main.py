@@ -25,10 +25,12 @@ from services.exporter import generate_pdf, generate_csv
 from services.demo_data import get_demo_session
 from services.audit_store import write_audit_log
 from services.session_store import save_session, load_session, purge_expired
+from services.auth_middleware import get_current_user, require_auth, check_session_ownership
 from routes.upload import router as upload_router
 from routes.pipeline import router as pipeline_router
 from routes.explain import router as explain_router
 from routes.talent_pool import router as talent_pool_router
+from routes.auth import router as auth_router
 
 
 # In-memory session store (file-backed for persistence across restarts)
@@ -64,6 +66,7 @@ app.add_middleware(
 )
 
 # Register routes
+app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(pipeline_router)
 app.include_router(explain_router)
@@ -100,6 +103,10 @@ async def full_analysis(request: Request):
     Full analysis pipeline: Upload JD + resumes → Parse → Embed → Score → Bias Audit.
     Accepts JSON body with jd_text and resume_texts.
     """
+    # Get current user (optional - allows both auth and non-auth for demo)
+    user = await get_current_user(request)
+    user_id = user.get("id") if user else None
+    
     body = await request.json()
     jd_text = body.get("jd_text", "")
     resume_texts = body.get("resume_texts", [])
@@ -133,6 +140,7 @@ async def full_analysis(request: Request):
 
     session = SessionData(
         session_id=session_id,
+        user_id=user_id,  # Associate session with authenticated user
         status="parsing",
         progress=0.0,
         created_at=datetime.now().isoformat(),
@@ -311,22 +319,10 @@ def _ensure_session_active(session: SessionData) -> None:
 
 
 @app.get("/api/session/{session_id}")
-async def get_session(session_id: str):
-    session = sessions.get(session_id)
-    if not session:
-        # Try disk fallback
-        session = load_session(session_id)
-        if session:
-            sessions[session_id] = session  # restore to memory
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found or expired")
-    _ensure_session_active(session)
-    return session
-
-
-@app.post("/api/recalculate/{session_id}")
-async def recalculate(session_id: str, weights: WeightsUpdate):
-    """Recalculate with new weights — no re-embedding."""
+async def get_session(session_id: str, request: Request):
+    user = await get_current_user(request)
+    user_id = user.get("id") if user else None
+    
     session = sessions.get(session_id)
     if not session:
         session = load_session(session_id)
@@ -334,6 +330,32 @@ async def recalculate(session_id: str, weights: WeightsUpdate):
             sessions[session_id] = session
     if not session:
         raise HTTPException(status_code=404, detail="Session not found or expired")
+    
+    # Check ownership
+    if not check_session_ownership(session, user_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    _ensure_session_active(session)
+    return session
+
+
+@app.post("/api/recalculate/{session_id}")
+async def recalculate(session_id: str, weights: WeightsUpdate, request: Request):
+    """Recalculate with new weights — no re-embedding."""
+    user = await get_current_user(request)
+    user_id = user.get("id") if user else None
+    
+    session = sessions.get(session_id)
+    if not session:
+        session = load_session(session_id)
+        if session:
+            sessions[session_id] = session
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found or expired")
+
+    # Check ownership
+    if not check_session_ownership(session, user_id):
+        raise HTTPException(status_code=403, detail="Access denied")
 
     _ensure_session_active(session)
     
@@ -357,7 +379,10 @@ async def recalculate(session_id: str, weights: WeightsUpdate):
 # ==================== EXPORT ====================
 
 @app.get("/api/export/pdf/{session_id}")
-async def export_pdf(session_id: str):
+async def export_pdf(session_id: str, request: Request):
+    user = await get_current_user(request)
+    user_id = user.get("id") if user else None
+    
     session = sessions.get(session_id)
     if not session:
         session = load_session(session_id)
@@ -365,6 +390,10 @@ async def export_pdf(session_id: str):
             sessions[session_id] = session
     if not session:
         raise HTTPException(status_code=404, detail="Session not found or expired")
+
+    # Check ownership
+    if not check_session_ownership(session, user_id):
+        raise HTTPException(status_code=403, detail="Access denied")
 
     _ensure_session_active(session)
     
@@ -377,7 +406,10 @@ async def export_pdf(session_id: str):
 
 
 @app.get("/api/export/csv/{session_id}")
-async def export_csv(session_id: str):
+async def export_csv(session_id: str, request: Request):
+    user = await get_current_user(request)
+    user_id = user.get("id") if user else None
+    
     session = sessions.get(session_id)
     if not session:
         session = load_session(session_id)
@@ -385,6 +417,10 @@ async def export_csv(session_id: str):
             sessions[session_id] = session
     if not session:
         raise HTTPException(status_code=404, detail="Session not found or expired")
+
+    # Check ownership
+    if not check_session_ownership(session, user_id):
+        raise HTTPException(status_code=403, detail="Access denied")
 
     _ensure_session_active(session)
     

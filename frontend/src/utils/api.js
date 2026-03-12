@@ -5,11 +5,28 @@ const api = axios.create({
   timeout: 300000, // 5 min — long processing
 })
 
+// Auth token interceptor
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('techvista_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
 api.interceptors.response.use(
   response => response,
   error => {
     const message = error.response?.data?.detail || error.message || 'An error occurred'
     console.error('API Error:', message)
+    // Handle 401 - redirect to login
+    if (error.response?.status === 401) {
+      localStorage.removeItem('techvista_token')
+      window.location.href = '/login'
+    }
     return Promise.reject(error)
   }
 )
@@ -163,3 +180,20 @@ export const getAuditStream = (sessionId = null, limit = 50, offset = 0) =>
 export const exportAuditLog = (sessionId) => api.get(`/audit/export/${sessionId}`)
 
 export default api
+
+// ==================== AUTH ====================
+
+export const signup = (email, password, fullName) =>
+  api.post('/auth/signup', { email, password, full_name: fullName })
+
+export const login = (email, password) =>
+  api.post('/auth/login', { email, password })
+
+export const logout = () => {
+  localStorage.removeItem('techvista_token')
+  localStorage.removeItem('techvista_user')
+  return api.post('/auth/logout')
+}
+
+export const getCurrentUser = () =>
+  api.get('/auth/me')
