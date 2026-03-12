@@ -14,6 +14,8 @@ import SkillGapCard from '../components/SkillGapCard'
 import JDQualityCard from '../components/JDQualityCard'
 import ShortcutsModal from '../components/ShortcutsModal'
 import DemoTour from '../components/DemoTour'
+import BiasAuditPanel from '../components/BiasAuditPanel'
+import { ScoreTicker } from '../components/NumberTicker'
 import { initShortcuts } from '../utils/shortcuts'
 
 function getScoreLevel(score) {
@@ -39,6 +41,7 @@ function ResultsPage() {
   const [activeTab, setActiveTab] = useState('detail')
   const [showWelcome, setShowWelcome] = useState(() => !!sessionData?.is_demo)
   const [showTour, setShowTour] = useState(false)
+  const [hoveredDim, setHoveredDim] = useState(null)
 
   const scores = sessionData?.scores || []
   const biasAudit = sessionData?.bias_audit
@@ -324,7 +327,7 @@ function ResultsPage() {
                       flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'
                     }}>{s.candidate_name}</span>
                     <span className={`score-pill ${getScoreLevel(s.composite_score)}`} style={{ fontSize: 11 }}>
-                      {s.composite_score.toFixed(0)}%
+                      <ScoreTicker value={s.composite_score} decimals={0} />
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', marginTop: 2, marginLeft: 44, gap: 4 }}>
@@ -454,19 +457,34 @@ function ResultsPage() {
 
                   {/* Dimension Score Cards */}
                   <div className="section-label">SCORE BREAKDOWN</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginTop: 8 }}>
+                  <div
+                    style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginTop: 8 }}
+                    onMouseLeave={() => setHoveredDim(null)}
+                  >
                     {dims.map((dim, di) => {
                       const score = selected[dim.scoreKey] || 0
+                      const isHovered = hoveredDim === dim.key
+                      const isDimmed = hoveredDim !== null && !isHovered
                       return (
                         <motion.div
                           key={dim.key}
                           initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: di * 0.1 }}
+                          animate={{
+                            opacity: isDimmed ? 0.5 : 1,
+                            y: 0,
+                            scale: isHovered ? 1.03 : isDimmed ? 0.97 : 1
+                          }}
+                          transition={{
+                            delay: di * 0.1,
+                            scale: { type: 'spring', stiffness: 400, damping: 25 },
+                            opacity: { duration: 0.15 }
+                          }}
+                          onMouseEnter={() => setHoveredDim(dim.key)}
                           style={{
                             background: 'var(--white)', border: '1px solid var(--border)',
                             borderRadius: 'var(--radius-card)', padding: 18,
                             position: 'relative', overflow: 'hidden',
+                            cursor: 'pointer',
                           }}
                         >
                           <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: dim.color }} />
@@ -629,102 +647,8 @@ function ResultsPage() {
           overflowY: 'auto', flexShrink: 0
         }}>
           <div style={{ padding: '20px 18px', flex: 1 }}>
-            {/* Bias Audit */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Shield size={14} style={{ color: 'var(--slate-mid)' }} />
-              <span className="section-label" style={{ marginBottom: 0 }}>BIAS AUDIT</span>
-            </div>
-            <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--slate-mid)', marginTop: 4 }}>
-              Statistical fairness on {scores.length} candidates
-            </p>
-
-            {scores.length < 6 && (
-              <div style={{
-                marginTop: 12, padding: '10px 12px',
-                background: '#FFF8E7', border: '1px solid rgba(146,102,10,0.25)',
-                borderRadius: 8, fontFamily: 'var(--font-sans)', fontSize: 12, color: '#92660A'
-              }}>
-                ⚠ Bias audit requires 6+ candidates. {6 - scores.length} more needed.
-              </div>
-            )}
-
-            {biasAudit && (
-              <div style={{
-                marginTop: 12, padding: '12px 14px',
-                borderRadius: 'var(--radius-card)',
-                background: biasAudit.overall_status === 'Flagged' ? 'var(--blush-light)' : 'var(--moss-light)',
-                borderLeft: `4px solid ${biasAudit.overall_status === 'Flagged' ? 'var(--blush)' : 'var(--moss)'}`,
-                border: '1px solid var(--border)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {biasAudit.overall_status === 'Flagged' ? (
-                    <>
-                      <span style={{ fontSize: 16, color: 'var(--blush)' }}>⚠</span>
-                      <div>
-                        <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 13, color: 'var(--blush)' }}>
-                          {biasAudit.flags_detected} Flag{biasAudit.flags_detected !== 1 ? 's' : ''} Detected
-                        </div>
-                        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--blush)', opacity: 0.8 }}>
-                          Normalisation applied
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <Shield size={16} style={{ color: 'var(--moss)' }} />
-                      <div>
-                        <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 13, color: 'var(--moss)' }}>All Checks Passed</div>
-                        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--moss)', opacity: 0.8 }}>No normalisation applied</div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Test Results */}
-            {biasAudit?.details && Object.keys(biasAudit.details).length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div className="section-label">TEST RESULTS</div>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--cream-mid)' }}>
-                      {['Category', 'Test', 'p', 'Status'].map(h => (
-                        <th key={h} style={{
-                          fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 10,
-                          textTransform: 'uppercase', color: 'var(--slate-mid)',
-                          padding: '6px 6px', textAlign: 'left', letterSpacing: '0.05em'
-                        }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(biasAudit.details).map(([cat, detail], i) => (
-                      <tr key={cat} style={{ background: i % 2 === 0 ? 'var(--white)' : 'var(--cream-mid)' }}>
-                        <td style={{ padding: '8px 6px', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--slate)' }}>
-                          {cat.replace('_', ' ')}
-                        </td>
-                        <td style={{ padding: '8px 6px', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--slate)' }}>
-                          {detail.test_used}
-                        </td>
-                        <td style={{
-                          padding: '8px 6px', fontFamily: 'var(--font-mono)', fontSize: 10,
-                          color: detail.bias_detected ? 'var(--blush)' : 'var(--moss)'
-                        }}>
-                          {detail.p_value?.toFixed(3)}
-                        </td>
-                        <td style={{ padding: '8px 6px' }}>
-                          <span className={`status-badge ${detail.bias_detected ? 'flagged' : 'pass'}`} style={{ fontSize: 9, padding: '2px 6px' }}>
-                            {detail.bias_detected && <span className="badge-dot" />}
-                            {detail.bias_detected ? 'FLAG' : 'PASS'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            {/* BiasAuditPanel — scanner sweep, text scramble, pulse rings */}
+            <BiasAuditPanel biasAudit={biasAudit} scoresCount={scores.length} />
 
             {/* Score Distribution Chart */}
             <div style={{ marginTop: 20 }}>
