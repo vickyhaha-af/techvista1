@@ -1,7 +1,7 @@
 import os
 import json
 import numpy as np
-import google.generativeai as genai
+from google import genai
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 
@@ -11,12 +11,12 @@ from models.schemas import (
 )
 from services.session_store import load_session
 from services.embedder import _embed_with_retry
-from config import BOOTSTRAP_ITERATIONS, BOOTSTRAP_CHUNKS, DEFAULT_WEIGHTS
+from config import BOOTSTRAP_ITERATIONS, BOOTSTRAP_CHUNKS, DEFAULT_WEIGHTS, GEMINI_API_KEY_1
 
 router = APIRouter(prefix="/api/explain", tags=["explain"])
 
-_gemini_key = os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GEMINI_API_KEY_1", "")
-genai.configure(api_key=_gemini_key)
+# Initialize the new SDK client
+client = genai.Client(api_key=GEMINI_API_KEY_1)
 
 def _cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
     if len(vec1) == 0 or len(vec2) == 0:
@@ -154,19 +154,14 @@ async def compare_candidates(request: CompareRequest):
 
     # Generate Narrative
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        
-        prompt = f"""You are an HR analytics engine. Write a single paragraph (max 60 words) explaining why Candidate A scored differently than Candidate B.
-Candidate A composite: {candA.composite_score:.1f}%
-Candidate B composite: {candB.composite_score:.1f}%
-Total Gap: {total_delta:.1f}pp
-Skills Contribution: {delta_skills_cont:.1f}pp ({s_share:.1f}% share of gap).
-Experience Contribution: {delta_exp_cont:.1f}pp ({e_share:.1f}% share of gap).
-Education Contribution: {delta_edu_cont:.1f}pp ({ed_share:.1f}% share of gap).
-
-The primary driver is {primary_driver}. Make it sound like a professional analytics insight. Do not use generic filler. Do not use bullet points. If Candidate A won, say "Candidate A possesses an advantage driven by..."
-"""
-        response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=0.3, max_output_tokens=120))
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt,
+            config=genai.types.GenerateContentConfig(
+                temperature=0.3,
+                max_output_tokens=120,
+            )
+        )
         narrative = response.text.strip()
     except Exception as e:
         print(f"Narrative generation failed: {e}")

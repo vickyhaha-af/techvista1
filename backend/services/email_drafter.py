@@ -2,14 +2,16 @@ import os
 import uuid
 import json
 import statistics
-import google.generativeai as genai
 from datetime import datetime, timezone
 
 from models.schemas import PipelineMoveRequest, EmailDraftResponse
 from services.session_store import load_session
 
-_gemini_key = os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GEMINI_API_KEY_1", "")
-genai.configure(api_key=_gemini_key)
+from google import genai
+from config import GEMINI_API_KEY_1, GEMINI_FLASH_MODEL
+
+# Initialize the new SDK client
+client = genai.Client(api_key=GEMINI_API_KEY_1)
 
 def draft_email_for_stage_change(request: PipelineMoveRequest) -> EmailDraftResponse | None:
     session = load_session(request.session_id)
@@ -128,11 +130,14 @@ Their application is currently in stage: {request.to_stage}.
 Tone: Professional, brief."""
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_prompt)
-        # temperature 0.75 as per spec
-        response = model.generate_content(
-            user_prompt,
-            generation_config=genai.types.GenerationConfig(temperature=0.75, max_output_tokens=300)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=user_prompt,
+            config=genai.types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.75,
+                max_output_tokens=300,
+            )
         )
         email_body = response.text.strip()
     except Exception as e:
@@ -160,10 +165,14 @@ Feedback to apply:
 
 Please rewrite the draft incorporating the feedback."""
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_prompt)
-        response = model.generate_content(
-            user_prompt,
-            generation_config=genai.types.GenerationConfig(temperature=0.85, max_output_tokens=300)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=user_prompt,
+            config=genai.types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.85,
+                max_output_tokens=300,
+            )
         )
         return response.text.strip()
     except Exception as e:
