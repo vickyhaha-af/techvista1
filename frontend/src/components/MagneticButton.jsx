@@ -8,10 +8,6 @@ import { motion } from 'framer-motion'
  *  - whileHover: scale 1.015  (subtle lift)
  *  - whileTap:   scale 0.96   (satisfying press)
  *  - Spring: stiffness 400, damping 17, mass 0.8 → tight, clicky feel
- *
- * Material:
- *  - .btn-primary receives a multi-layered sage glow on hover via
- *    the `glow` prop (default true for primary buttons).
  */
 
 const springTransition = {
@@ -32,18 +28,15 @@ export default function MagneticButton({
   title,
   ...rest
 }) {
-  // Build combined className — append Tailwind hover:shadow glow if glow=true
-  const glowClass = glow && !disabled
-    ? 'hover:shadow-[0_0_20px_rgba(74,124,111,0.3),_0_0_40px_rgba(74,124,111,0.1)]'
-    : ''
-
-  const combinedClass = [className, glowClass].filter(Boolean).join(' ')
+  const glowStyle = glow && !disabled
+    ? { boxShadow: '0 0 20px rgba(74,124,111,0.3), 0 0 40px rgba(74,124,111,0.1)' }
+    : {}
 
   return (
     <motion.button
       type={type}
-      className={combinedClass}
-      style={style}
+      className={className}
+      style={{ ...glowStyle, ...style }}
       disabled={disabled}
       onClick={onClick}
       title={title}

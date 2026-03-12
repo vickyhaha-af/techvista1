@@ -2,12 +2,11 @@ import React, { useRef } from 'react'
 import { motion, useMotionValue, useSpring } from 'framer-motion'
 
 /**
- * Glassmorphism card with mouse-following radial spotlight — Tailwind-free version
- * Card background: semi-transparent white with backdrop blur using inline CSS
+ * SpotlightCard — Glassmorphism card with mouse-following radial spotlight.
+ * Semi-transparent white background with backdrop blur (CSS inline, no Tailwind).
  */
 export default function SpotlightCard({ children, style = {} }) {
   const cardRef = useRef(null)
-
   const mouseX = useMotionValue(0)
   const mouseY = useMotionValue(0)
 
@@ -49,7 +48,6 @@ export default function SpotlightCard({ children, style = {} }) {
       transition={{ duration: 0.35 }}
       whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
     >
-      {/* Spotlight gradient overlay */}
       <motion.div
         style={{
           pointerEvents: 'none',
@@ -57,8 +55,6 @@ export default function SpotlightCard({ children, style = {} }) {
           background: `radial-gradient(350px circle at ${spotlightX}px ${spotlightY}px, rgba(74,124,111,0.13), transparent 60%)`,
         }}
       />
-
-      {/* Content */}
       <div style={{ position: 'relative', zIndex: 1 }}>
         {children}
       </div>

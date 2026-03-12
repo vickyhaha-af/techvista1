@@ -1,13 +1,13 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { Check, ShieldAlert, Award } from 'lucide-react'
+import { Check, Award } from 'lucide-react'
 
 function ScoringTable({
   scores,
   selectedCandidate,
   selectedIndex,
   onSelect,
-  comparisonCandidates,
+  comparisonCandidates, // array of max 2 cands
   onToggleComparison
 }) {
   const getScoreColor = (score) => {
@@ -18,10 +18,10 @@ function ScoringTable({
   }
 
   const getRankBadgeProps = (rank) => {
-    if (rank === 1) return { color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.15)' } // Gold
-    if (rank === 2) return { color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' } // Silver
-    if (rank === 3) return { color: '#b45309', bg: 'rgba(180, 83, 9, 0.15)' } // Bronze
-    return { color: 'var(--text-muted)', bg: 'var(--bg-glass)' }
+    if (rank === 1) return { color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.15)' } 
+    if (rank === 2) return { color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' }
+    if (rank === 3) return { color: '#b45309', bg: 'rgba(180, 83, 9, 0.15)' } 
+    return { color: 'var(--slate-mid)', bg: 'var(--cream-mid)' }
   }
 
   return (
@@ -30,9 +30,13 @@ function ScoringTable({
         <table className="data-table">
           <thead>
             <tr>
-              <th style={{ width: '40px' }}>Rank</th>
-              <th style={{ width: '40px' }}>Compare</th>
-              <th>Candidate</th>
+              <th style={{ width: 60, textAlign: 'center' }}>Rank</th>
+              <th style={{ width: 80, textAlign: 'center', color: 'var(--sage)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <Award size={12} /> AI Compare
+                </div>
+              </th>
+              <th>Candidate Name</th>
               <th>Match Score</th>
               <th>Skills</th>
               <th>Exp</th>
@@ -56,31 +60,48 @@ function ScoringTable({
                   transition={{ delay: i * 0.05 }}
                 >
                   <td style={{ textAlign: 'center' }}>
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      background: rb.bg,
-                      color: rb.color,
-                      fontWeight: 700,
-                      fontSize: '0.85rem'
-                    }}>
+                    <motion.div 
+                      whileHover={{ scale: 1.1 }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: rb.bg,
+                        color: rb.color,
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                      }}>
                       {c.rank}
-                    </div>
+                    </motion.div>
                   </td>
-                  <td onClick={e => e.stopPropagation()}>
-                    <div
-                      className={`checkbox ${isComparing ? 'checked' : ''}`}
-                      onClick={() => onToggleComparison(c)}
+                  <td onClick={e => {
+                    e.stopPropagation()
+                    onToggleComparison(c)}
+                  } style={{ cursor: 'pointer' }}>
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      title={isComparing ? "Remove from comparison" : "Select for 1v1 comparison"}
+                      style={{
+                        width: 22, height: 22, borderRadius: 6,
+                        border: `2px solid ${isComparing ? 'var(--sage)' : 'var(--border-dark)'}`,
+                        background: isComparing ? 'var(--sage)' : 'var(--white)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: isComparing ? '0 0 8px rgba(74,124,111,0.3)' : 'none',
+                        transition: 'all 0.2s ease',
+                        margin: '0 auto'
+                      }}
                     >
-                      {isComparing && <Check size={12} color="white" strokeWidth={3} />}
-                    </div>
+                      {isComparing && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><Check size={14} color="var(--cream)" strokeWidth={3} /></motion.div>}
+                    </motion.div>
                   </td>
                   <td>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--ink)' }}>
                       {c.candidate_name.replace('.pdf', '')}
                     </div>
                   </td>
@@ -122,9 +143,15 @@ function ScoringTable({
                   </td>
                   <td>
                     {c.adjusted ? (
-                      <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>Adjusted</span>
+                      <span style={{ 
+                        background: 'var(--blush-pale)', color: 'var(--blush)', 
+                        padding: '2px 8px', borderRadius: 12, fontSize: 11, fontFamily: 'var(--font-mono)' 
+                      }}>Adjusted</span>
                     ) : (
-                      <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Clear</span>
+                      <span style={{ 
+                        background: 'var(--moss-pale)', color: 'var(--moss)', 
+                        padding: '2px 8px', borderRadius: 12, fontSize: 11, fontFamily: 'var(--font-mono)' 
+                      }}>Clear</span>
                     )}
                   </td>
                 </motion.tr>

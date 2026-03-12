@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, ChevronDown, ChevronUp, Search, Shield, ArrowRight,
   GitCompare, Target, CheckSquare, Square, FileText, Scale,
-  Play, Sparkles
+  Play, Sparkles, Columns, Database, Mail
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useSession } from '../App'
@@ -17,6 +17,12 @@ import DemoTour from '../components/DemoTour'
 import BiasAuditPanel from '../components/BiasAuditPanel'
 import { ScoreTicker } from '../components/NumberTicker'
 import { initShortcuts } from '../utils/shortcuts'
+// Advanced Hiring OS Features
+import KanbanBoard from '../components/KanbanBoard'
+import TalentPoolPage from './TalentPoolPage'
+import CandidateComparePanel from '../components/CandidateComparePanel'
+import SentenceAttribution from '../components/SentenceAttribution'
+import MagneticButton from '../components/MagneticButton'
 
 function getScoreLevel(score) {
   if (score >= 70) return 'high'
@@ -42,6 +48,10 @@ function ResultsPage() {
   const [showWelcome, setShowWelcome] = useState(() => !!sessionData?.is_demo)
   const [showTour, setShowTour] = useState(false)
   const [hoveredDim, setHoveredDim] = useState(null)
+
+  // AI Comparison (Feature 2)
+  const [aiCompareSet, setAiCompareSet] = useState([])
+  const [isAiCompareOpen, setIsAiCompareOpen] = useState(false)
 
   const scores = sessionData?.scores || []
   const biasAudit = sessionData?.bias_audit
@@ -86,9 +96,20 @@ function ResultsPage() {
         setShowWeightModal(false)
         setShowComparison(false)
         setShowShortcuts(false)
+        setIsAiCompareOpen(false)
       },
     })
   }, [navigateUp, navigateDown, compareSet.size, goToExport])
+
+  // AI Comparison toggle (max 2)
+  const handleToggleAiCompare = (candidate) => {
+    setAiCompareSet(prev => {
+      const exists = prev.find(c => c.candidate_name === candidate.candidate_name)
+      if (exists) return prev.filter(c => c.candidate_name !== candidate.candidate_name)
+      if (prev.length >= 4) return prev
+      return [...prev, candidate]
+    })
+  }
 
   // Weight re-run
   const handleRerun = async () => {
@@ -292,6 +313,7 @@ function ResultsPage() {
               const isSelected = selectedIdx === i
               const isShortlisted = shortlisted.has(s.candidate_name)
               const isInCompare = compareSet.has(s.candidate_name)
+              const isInAiCompare = aiCompareSet.some(c => c.candidate_name === s.candidate_name)
               const rankNum = s.rank || i + 1
               return (
                 <div
@@ -338,6 +360,18 @@ function ResultsPage() {
                       {(s.matched_skills || []).slice(0, 3).join(' · ') || 'No matched skills'}
                     </span>
                     {s.bias_flag && <Scale size={11} style={{ color: 'var(--slate-light)', flexShrink: 0 }} title="Score normalised for fairness" />}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleToggleAiCompare(s) }}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0,
+                        color: isInAiCompare ? 'var(--sage)' : 'var(--slate-light)',
+                        transition: 'color 150ms, transform 150ms',
+                        transform: isInAiCompare ? 'scale(1.2)' : 'scale(1)'
+                      }}
+                      title={isInAiCompare ? 'Remove from AI comparison' : 'Add to AI comparison'}
+                    >
+                      <GitCompare size={11} />
+                    </button>
                   </div>
 
                   {/* Compare checkbox */}
@@ -374,6 +408,8 @@ function ResultsPage() {
               { key: 'detail', label: 'Candidate Detail', icon: User },
               { key: 'skillgap', label: 'Skill Gap', icon: Target },
               { key: 'jdquality', label: 'JD Quality', icon: FileText },
+              { key: 'kanban', label: 'Pipeline Board', icon: Columns },
+              { key: 'talent-pool', label: 'Talent Pool', icon: Database },
             ].map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -395,7 +431,15 @@ function ResultsPage() {
 
           <div style={{ padding: '28px 32px' }}>
             <AnimatePresence mode="wait">
-              {activeTab === 'skillgap' ? (
+              {activeTab === 'kanban' ? (
+                <motion.div key="kanban" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <KanbanBoard sessionId={sessionData?.session_id} candidates={scores} />
+                </motion.div>
+              ) : activeTab === 'talent-pool' ? (
+                <motion.div key="talent-pool" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <TalentPoolPage sessionData={sessionData} />
+                </motion.div>
+              ) : activeTab === 'skillgap' ? (
                 <motion.div key="skillgap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <SkillGapCard candidate={selected} />
                 </motion.div>
@@ -416,13 +460,48 @@ function ResultsPage() {
                 </motion.div>
               ) : (
                 <motion.div key={selected.candidate_name} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  {/* Candidate Header */}
+                  {/* ──── ENHANCED CANDIDATE HEADER ──── */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 26, color: 'var(--ink)' }}>
-                          {selected.candidate_name}
-                        </h2>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                        <div style={{
+                          width: 42, height: 42, borderRadius: '50%',
+                          background: 'var(--sage-light)', color: 'var(--sage)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 18, fontFamily: 'var(--font-display)', fontWeight: 700
+                        }}>
+                          {selected.candidate_name.charAt(0)}
+                        </div>
+                        <div>
+                          <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 24, color: 'var(--ink)', margin: 0 }}>
+                            {selected.candidate_name}
+                          </h2>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                            <span style={{
+                              fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--sage)',
+                              background: 'var(--sage-pale)', padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontWeight: 600
+                            }}>
+                              {(selected.experience_cohort || 'fresher').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </span>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--slate-mid)' }}>
+                              {selected.experience_years?.toFixed(1) || '0'} yrs exp
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--slate-light)' }}>•</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--slate-mid)' }}>
+                              {(selected.institution_tier || 'tier_3').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                      <div>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 42, color: 'var(--ink)', lineHeight: 1 }}>
+                          {selected.composite_score.toFixed(1)}%
+                        </span>
+                        <div className="section-label" style={{ marginBottom: 0, marginTop: 2 }}>COMPOSITE SCORE</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
                         <button
                           onClick={() => toggleShortlist(selected.candidate_name)}
                           className={shortlisted.has(selected.candidate_name) ? 'btn-primary' : 'btn-secondary'}
@@ -431,34 +510,22 @@ function ResultsPage() {
                           {shortlisted.has(selected.candidate_name) ? <CheckSquare size={11} /> : <Square size={11} />}
                           {shortlisted.has(selected.candidate_name) ? 'Shortlisted' : 'Shortlist'}
                         </button>
+                        <button
+                          onClick={() => handleToggleAiCompare(selected)}
+                          className={aiCompareSet.some(c => c.candidate_name === selected.candidate_name) ? 'btn-primary' : 'btn-secondary'}
+                          style={{ height: 28, fontSize: 11, padding: '0 10px', gap: 5 }}
+                        >
+                          <GitCompare size={11} /> AI Compare
+                        </button>
                       </div>
-                      <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--slate-mid)' }}>
-                        {(selected.matched_skills || []).slice(0, 3).join('  ·  ')}
-                      </p>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 44, color: 'var(--ink)' }}>
-                        {selected.composite_score.toFixed(1)}%
-                      </span>
-                      <div className="section-label" style={{ marginBottom: 0 }}>COMPOSITE SCORE</div>
-                      {selected.normalized_score != null && (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          background: 'var(--blush-light)', color: 'var(--blush)',
-                          borderRadius: 'var(--radius-pill)',
-                          fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 11,
-                          padding: '2px 8px', marginTop: 4
-                        }}>⚖ Normalised</span>
-                      )}
                     </div>
                   </div>
 
                   <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '20px 0' }} />
 
-                  {/* Dimension Score Cards */}
-                  <div className="section-label">SCORE BREAKDOWN</div>
-                  <div
-                    style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginTop: 8 }}
+                  {/* ──── SCORE BREAKDOWN (Visual Bars) ──── */}
+                  <div className="section-label">DIMENSION SCORES</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginTop: 8 }}
                     onMouseLeave={() => setHoveredDim(null)}
                   >
                     {dims.map((dim, di) => {
@@ -470,21 +537,15 @@ function ResultsPage() {
                           key={dim.key}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{
-                            opacity: isDimmed ? 0.5 : 1,
-                            y: 0,
+                            opacity: isDimmed ? 0.5 : 1, y: 0,
                             scale: isHovered ? 1.03 : isDimmed ? 0.97 : 1
                           }}
-                          transition={{
-                            delay: di * 0.1,
-                            scale: { type: 'spring', stiffness: 400, damping: 25 },
-                            opacity: { duration: 0.15 }
-                          }}
+                          transition={{ delay: di * 0.1, scale: { type: 'spring', stiffness: 400, damping: 25 } }}
                           onMouseEnter={() => setHoveredDim(dim.key)}
                           style={{
                             background: 'var(--white)', border: '1px solid var(--border)',
                             borderRadius: 'var(--radius-card)', padding: 18,
-                            position: 'relative', overflow: 'hidden',
-                            cursor: 'pointer',
+                            position: 'relative', overflow: 'hidden', cursor: 'pointer',
                           }}
                         >
                           <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: dim.color }} />
@@ -496,36 +557,51 @@ function ResultsPage() {
                             <span style={{
                               display: 'inline-block', marginLeft: 8,
                               background: 'var(--cream-mid)', color: 'var(--slate-mid)',
-                              borderRadius: 'var(--radius-tag)',
-                              fontFamily: 'var(--font-sans)', fontSize: 10, padding: '2px 6px'
+                              borderRadius: 'var(--radius-tag)', fontFamily: 'var(--font-sans)', fontSize: 10, padding: '2px 6px'
                             }}>{Math.round(dim.weight * 100)}% wt</span>
                           </div>
                           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'var(--cream-deep)' }}>
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${score}%` }}
-                              transition={{ duration: 0.7, ease: 'easeOut', delay: 0.2 }}
-                              style={{ height: '100%', background: dim.color }}
-                            />
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${score}%` }} transition={{ duration: 0.7, ease: 'easeOut', delay: 0.2 }}
+                              style={{ height: '100%', background: dim.color }} />
                           </div>
                         </motion.div>
                       )
                     })}
                   </div>
 
-                  {/* Why This Score — Accordions */}
-                  <div style={{ marginTop: 28 }}>
-                    <div className="section-label">WHY THIS SCORE</div>
+                  {/* ──── AI ANALYSIS NARRATIVE ──── */}
+                  <div style={{ marginTop: 24 }}>
+                    <div className="section-label">AI ANALYSIS SUMMARY</div>
+                    <div style={{
+                      background: 'var(--sage-pale)', borderLeft: '4px solid var(--sage)',
+                      borderRadius: '0 8px 8px 0', padding: '16px 20px', marginTop: 8,
+                    }}>
+                      <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)', lineHeight: 1.7, margin: 0 }}>
+                        {selected.composite_score >= 80
+                          ? `${selected.candidate_name} is a strong match for this role. With ${selected.experience_years?.toFixed(1) || '0'} years of experience and a composite score of ${selected.composite_score.toFixed(1)}%, this candidate demonstrates excellent alignment across all evaluation dimensions. Their skills profile shows particularly strong overlap with the required tech stack, and their experience level places them in the ${(selected.experience_cohort || 'mid_level').replace('_', ' ')} cohort. Recommended for immediate shortlisting.`
+                          : selected.composite_score >= 60
+                          ? `${selected.candidate_name} shows solid potential for this role with a ${selected.composite_score.toFixed(1)}% composite score. Their ${selected.experience_years?.toFixed(1) || '0'} years of experience provide a strong foundation, though some skill gaps exist in the required stack. As a ${(selected.experience_cohort || 'mid_level').replace('_', ' ')} candidate from a ${(selected.institution_tier || 'tier_3').replace('_', ' ')} institution, they could benefit from targeted upskilling. Consider for a technical screening round.`
+                          : selected.composite_score >= 40
+                          ? `${selected.candidate_name} has partial alignment with this role at ${selected.composite_score.toFixed(1)}%. While they bring ${selected.experience_years?.toFixed(1) || '0'} years of industry experience, significant gaps exist in core required skills. Their background suggests potential in adjacent areas. Consider if the role scope can accommodate a learning curve, or for alternative positions.`
+                          : `${selected.candidate_name} scored ${selected.composite_score.toFixed(1)}% — below the recommended threshold for this role. The skill overlap is minimal, suggesting their expertise lies in a different domain. Their ${selected.experience_years?.toFixed(1) || '0'} years of experience are primarily in areas not directly relevant to the current requirements.`
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* ──── WHY THIS SCORE — Accordions ──── */}
+                  <div style={{ marginTop: 24 }}>
+                    <div className="section-label">DETAILED SCORE REASONING</div>
                     {dims.map((dim) => {
                       const isOpen = expandedDim === dim.key
                       const score = selected[dim.scoreKey] || 0
                       const explanation = selected[`${dim.key}_explanation`] || ''
                       const matched = dim.key === 'skills' ? (selected.matched_skills || []) : []
+                      const partial = dim.key === 'skills' ? (selected.partial_skills || []) : []
                       const gaps = dim.key === 'skills' ? (selected.missing_skills || []) : []
                       return (
                         <div key={dim.key} style={{ marginBottom: 4 }}>
-                          <div
-                            onClick={() => setExpandedDim(isOpen ? null : dim.key)}
+                          <div onClick={() => setExpandedDim(isOpen ? null : dim.key)}
                             style={{
                               display: 'flex', alignItems: 'center', gap: 10,
                               background: 'var(--cream)', border: '1px solid var(--border)',
@@ -542,13 +618,8 @@ function ResultsPage() {
                           </div>
                           <AnimatePresence>
                             {isOpen && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.22 }}
-                                style={{ overflow: 'hidden' }}
-                              >
+                              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22 }} style={{ overflow: 'hidden' }}>
                                 <div style={{
                                   background: 'var(--white)', border: '1px solid var(--border)',
                                   borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '14px 16px'
@@ -558,18 +629,28 @@ function ResultsPage() {
                                   </p>
                                   {matched.length > 0 && (
                                     <div style={{ marginTop: 10 }}>
-                                      <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', color: 'var(--slate-light)', letterSpacing: '0.08em' }}>
-                                        Matched
+                                      <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', color: 'var(--moss)', letterSpacing: '0.08em' }}>
+                                        ✓ Direct Matches ({matched.length})
                                       </span>
                                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-                                        {matched.map((m) => <span key={m} className="chip" style={{ fontSize: 11 }}>{m}</span>)}
+                                        {matched.map((m) => <span key={m} className="chip" style={{ fontSize: 11, borderColor: 'var(--moss)', color: 'var(--moss)' }}>{m}</span>)}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {partial.length > 0 && (
+                                    <div style={{ marginTop: 8 }}>
+                                      <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', color: 'var(--accent-experience)', letterSpacing: '0.08em' }}>
+                                        ◐ Partial Matches ({partial.length})
+                                      </span>
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                                        {partial.map((p) => <span key={p} className="chip" style={{ fontSize: 11, borderColor: 'var(--accent-experience)', color: 'var(--accent-experience)' }}>{p}</span>)}
                                       </div>
                                     </div>
                                   )}
                                   {gaps.length > 0 && (
                                     <div style={{ marginTop: 8 }}>
-                                      <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', color: 'var(--slate-light)', letterSpacing: '0.08em' }}>
-                                        Gaps
+                                      <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', color: 'var(--blush)', letterSpacing: '0.08em' }}>
+                                        ✗ Gaps ({gaps.length})
                                       </span>
                                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
                                         {gaps.map((g) => <span key={g} className="chip gap" style={{ fontSize: 11 }}>{g}</span>)}
@@ -585,48 +666,93 @@ function ResultsPage() {
                     })}
                   </div>
 
-                  {/* Parsed Resume Data */}
-                  <div style={{ marginTop: 28 }}>
-                    <div className="section-label">PARSED RESUME DATA</div>
+                  {/* ──── COMPREHENSIVE RESUME PROFILE ──── */}
+                  <div style={{ marginTop: 24 }}>
+                    <div className="section-label">CANDIDATE PROFILE</div>
                     <div style={{
                       background: 'var(--white)', border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-card)', padding: 18,
-                      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0,
+                      borderRadius: 'var(--radius-card)', padding: 20, marginTop: 8,
                     }}>
-                      <div style={{ padding: '0 14px' }}>
-                        <div className="section-label">SKILLS</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                          {(selected.matched_skills || []).concat(selected.partial_skills || []).slice(0, 8).map(sk => (
-                            <span key={sk} style={{
-                              background: 'var(--cream-mid)', border: '1px solid var(--border)',
-                              borderRadius: 'var(--radius-tag)',
-                              fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--slate)', padding: '3px 8px'
-                            }}>{sk}</span>
-                          ))}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                        {/* Skills Panel */}
+                        <div>
+                          <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--accent-skills)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                            Technical Skills
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                            {(selected.matched_skills || []).map(sk => (
+                              <span key={sk} style={{
+                                background: 'rgba(74,124,111,0.1)', border: '1px solid rgba(74,124,111,0.3)',
+                                borderRadius: 'var(--radius-tag)', fontFamily: 'var(--font-mono)', fontSize: 11,
+                                color: 'var(--moss)', padding: '3px 8px', fontWeight: 500
+                              }}>{sk}</span>
+                            ))}
+                            {(selected.partial_skills || []).map(sk => (
+                              <span key={sk} style={{
+                                background: 'rgba(123,143,168,0.1)', border: '1px solid rgba(123,143,168,0.3)',
+                                borderRadius: 'var(--radius-tag)', fontFamily: 'var(--font-mono)', fontSize: 11,
+                                color: 'var(--accent-experience)', padding: '3px 8px', fontWeight: 500
+                              }}>{sk}</span>
+                            ))}
+                            {(selected.missing_skills || []).slice(0, 4).map(sk => (
+                              <span key={sk} style={{
+                                background: 'rgba(196,117,106,0.1)', border: '1px dashed rgba(196,117,106,0.3)',
+                                borderRadius: 'var(--radius-tag)', fontFamily: 'var(--font-mono)', fontSize: 11,
+                                color: 'var(--blush)', padding: '3px 8px', fontWeight: 400, textDecoration: 'line-through', opacity: 0.7
+                              }}>{sk}</span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                      <div style={{ padding: '0 14px', borderLeft: '1px solid var(--cream-deep)' }}>
-                        <div className="section-label">EXPERIENCE</div>
-                        <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--slate)' }}>
-                          {selected.experience_years?.toFixed(1) || '0'} years
-                        </p>
-                        <p style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--slate-mid)', marginTop: 2 }}>
-                          {(selected.experience_cohort || '').replace('_', ' ')}
-                        </p>
-                      </div>
-                      <div style={{ padding: '0 14px', borderLeft: '1px solid var(--cream-deep)' }}>
-                        <div className="section-label">EDUCATION</div>
-                        <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--slate)' }}>
-                          {(selected.institution_tier || 'tier_3').replace('_', ' ')}
-                        </p>
+
+                        {/* Career Panel */}
+                        <div>
+                          <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--accent-experience)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                            Career Profile
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--cream-deep)' }}>
+                              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--slate-mid)' }}>Experience</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', fontWeight: 600 }}>
+                                {selected.experience_years?.toFixed(1) || '0'} years
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--cream-deep)' }}>
+                              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--slate-mid)' }}>Seniority Level</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', fontWeight: 600 }}>
+                                {(selected.experience_cohort || 'N/A').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--cream-deep)' }}>
+                              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--slate-mid)' }}>Institution Tier</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', fontWeight: 600 }}>
+                                {(selected.institution_tier || 'tier_3').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--cream-deep)' }}>
+                              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--slate-mid)' }}>Bias Flag</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: selected.bias_flag ? 'var(--blush)' : 'var(--moss)', fontWeight: 600 }}>
+                                {selected.bias_flag ? '⚠ Normalised' : '✓ Clean'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--slate-mid)' }}>Overall Rank</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--sage)', fontWeight: 700 }}>
+                                #{selected.rank || '-'} of {scores.length}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Navigate to Export */}
-                  <div style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                  {/* ──── ACTION ROW ──── */}
+                  <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                     <button className="btn-secondary" onClick={() => setActiveTab('skillgap')} style={{ fontSize: 13 }}>
                       <Target size={13} /> View Skill Gap
+                    </button>
+                    <button className="btn-secondary" onClick={() => setActiveTab('kanban')} style={{ fontSize: 13 }}>
+                      <Columns size={13} /> Pipeline Board
                     </button>
                     <button className="btn-primary" onClick={goToExport}
                       style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>
@@ -729,6 +855,16 @@ function ResultsPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Sentence Attribution Drill-Down */}
+            {selected && sessionData?.session_id && (
+              <div style={{ marginTop: 20 }}>
+                <div className="section-label">EXPLAINABLE AI</div>
+                <SentenceAttribution sessionId={sessionData.session_id} candidateId={selected.candidate_name} dimension="skills" />
+                <SentenceAttribution sessionId={sessionData.session_id} candidateId={selected.candidate_name} dimension="experience" />
+                <SentenceAttribution sessionId={sessionData.session_id} candidateId={selected.candidate_name} dimension="education" />
               </div>
             )}
 
@@ -902,6 +1038,74 @@ function ResultsPage() {
               </p>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* AI Candidate Compare Panel (Feature 2 — Bootstrap CI + Narrative) */}
+      {aiCompareSet.length >= 2 && (
+        <CandidateComparePanel
+          isOpen={isAiCompareOpen}
+          onClose={() => setIsAiCompareOpen(false)}
+          sessionId={sessionData?.session_id}
+          candidates={aiCompareSet}
+        />
+      )}
+
+      {/* Floating AI Compare Action Bar */}
+      <AnimatePresence>
+        {aiCompareSet.length > 0 && (
+          <motion.div
+            initial={{ y: 100, opacity: 0, x: '-50%' }}
+            animate={{ y: 0, opacity: 1, x: '-50%' }}
+            exit={{ y: 100, opacity: 0, x: '-50%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            style={{
+              position: 'fixed', bottom: 24, left: '50%',
+              background: 'var(--ink)', padding: '12px 22px', borderRadius: 24,
+              display: 'flex', alignItems: 'center', gap: 20,
+              boxShadow: '0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1)',
+              zIndex: 400, color: 'var(--white)', maxWidth: 'calc(100vw - 48px)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%',
+                background: aiCompareSet.length >= 2 ? 'var(--moss)' : 'var(--slate-dark)',
+                color: aiCompareSet.length >= 2 ? 'var(--cream)' : 'var(--slate-light)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontFamily: 'var(--font-sans)', fontSize: 15,
+                transition: 'all 0.3s ease'
+              }}>
+                {aiCompareSet.length}/4
+              </div>
+              <div style={{ fontFamily: 'var(--font-sans)' }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>AI Candidate Comparison</div>
+                <div style={{ color: 'var(--slate-light)', fontSize: 12, marginTop: 1 }}>
+                  {aiCompareSet.length === 1 ? 'Select 1-3 more candidates' : `${aiCompareSet.length} selected — ready to compare`}
+                </div>
+              </div>
+            </div>
+            <AnimatePresence>
+              {aiCompareSet.length >= 2 && (
+                <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}>
+                  <MagneticButton
+                    className="btn-primary"
+                    onClick={() => setIsAiCompareOpen(true)}
+                    style={{ background: 'var(--sage)', color: 'var(--cream)', border: 'none', padding: '8px 20px', borderRadius: 20, fontSize: 13 }}
+                  >
+                    <GitCompare size={14} style={{ marginRight: 6 }} />
+                    Run AI Analysis
+                  </MagneticButton>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <button
+              onClick={() => setAiCompareSet([])}
+              style={{ background: 'none', border: 'none', color: 'var(--slate-light)', cursor: 'pointer', padding: 4, fontSize: 11, fontFamily: 'var(--font-sans)' }}
+            >
+              Clear
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
     </motion.div>

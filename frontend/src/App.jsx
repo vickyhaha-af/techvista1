@@ -4,9 +4,11 @@ import Navbar from './components/Navbar'
 import UploadPage from './pages/UploadPage'
 import ProcessingPage from './pages/ProcessingPage'
 import ResultsPage from './pages/ResultsPage'
+import DashboardPage from './pages/DashboardPage'
 import ExportPage from './pages/ExportPage'
 import LandingPage from './pages/LandingPage'
 import { ToastProvider } from './components/Toast'
+import { ModalProvider, SpatialContent } from './components/ModalContext'
 
 // Global session context
 const SessionContext = createContext(null)
@@ -42,6 +44,12 @@ function AppContent() {
     navigate('/export')
   }
 
+  const goToDashboard = (data) => {
+    if (data) setSessionData(data)
+    setCurrentStep(3) // Share step 3 with Results
+    navigate('/dashboard')
+  }
+
   const startNew = () => {
     setSessionData(null)
     setCurrentStep(1)
@@ -57,18 +65,21 @@ function AppContent() {
     <SessionContext.Provider value={{
       sessionData, setSessionData,
       currentStep, setCurrentStep,
-      goToProcessing, goToResults, goToExport, startNew, goHome
+      goToProcessing, goToResults, goToDashboard, goToExport, startNew, goHome
     }}>
-      {currentStep > 0 && <Navbar currentStep={currentStep} />}
-      <div className={currentStep > 0 ? 'main-content' : ''}>
+      <SpatialContent className={currentStep > 0 ? 'main-content' : ''}>
+        {currentStep > 0 && <Navbar currentStep={currentStep} />}
         <Routes>
           <Route path="/" element={<LandingPage onStart={startScreening} />} />
           <Route path="/upload" element={<UploadPage />} />
           <Route path="/processing" element={<ProcessingPage />} />
           <Route path="/results" element={<ResultsPage />} />
+          <Route path="/dashboard" element={
+            sessionData ? <DashboardPage sessionData={sessionData} setSessionData={setSessionData} /> : <Navigate to="/" />
+          } />
           <Route path="/export" element={<ExportPage />} />
         </Routes>
-      </div>
+      </SpatialContent>
     </SessionContext.Provider>
   )
 }
@@ -77,7 +88,9 @@ function App() {
   return (
     <BrowserRouter>
       <ToastProvider>
-        <AppContent />
+        <ModalProvider>
+          <AppContent />
+        </ModalProvider>
       </ToastProvider>
     </BrowserRouter>
   )

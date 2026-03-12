@@ -7,6 +7,16 @@ load_dotenv()
 GEMINI_API_KEY_1 = os.getenv("GEMINI_API_KEY_1", "")
 GEMINI_API_KEY_2 = os.getenv("GEMINI_API_KEY_2", "")
 
+# Supabase Auth
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+
+# Email Settings
+EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "mock") # "mock", "smtp", "sendgrid", "ses"
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "hiring@techvista.demo")
+FROM_NAME = os.getenv("FROM_NAME", "Tech Vista Hiring Team")
+
 # Models
 GEMINI_FLASH_MODEL = "gemini-2.0-flash"
 GEMINI_EMBEDDING_MODEL = "text-embedding-004"
@@ -51,3 +61,9 @@ EXPERIENCE_COHORTS = {
 # Rate limiting
 API_CALL_DELAY_SECONDS = 0.5
 MAX_RETRIES = 3
+
+# Feature 2 & 3: Advanced Hiring OS Parameters
+TALENT_POOL_DECAY_LAMBDA = float(os.getenv("TALENT_POOL_DECAY_LAMBDA", "0.005"))
+TALENT_POOL_MIN_SCORE = float(os.getenv("TALENT_POOL_MIN_SCORE", "30.0"))
+BOOTSTRAP_ITERATIONS = int(os.getenv("BOOTSTRAP_ITERATIONS", "1000"))
+BOOTSTRAP_CHUNKS = int(os.getenv("BOOTSTRAP_CHUNKS", "10"))

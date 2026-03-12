@@ -25,6 +25,10 @@ from services.exporter import generate_pdf, generate_csv
 from services.demo_data import get_demo_session
 from services.audit_store import write_audit_log
 from services.session_store import save_session, load_session, purge_expired
+from routes.upload import router as upload_router
+from routes.pipeline import router as pipeline_router
+from routes.explain import router as explain_router
+from routes.talent_pool import router as talent_pool_router
 
 
 # In-memory session store (file-backed for persistence across restarts)
@@ -62,6 +66,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register routes
+app.include_router(upload_router)
+app.include_router(pipeline_router)
+app.include_router(explain_router)
+app.include_router(talent_pool_router)
 
 
 # ==================== HEALTH ====================
